@@ -1,9 +1,11 @@
 import {itBench, setBenchOpts} from "@dapplion/benchmark";
 import crypto from "crypto";
 import {ChaCha20Poly1305 as ChaCha20Poly1305Stablelib} from "@stablelib/chacha20poly1305";
+import {chacha20poly1305 as chacha20poly1305Noble} from '@noble/ciphers/chacha';
 import {ChaCha20Poly1305} from "../../src/chacha20poly1305";
-import {KEY_LENGTH, NONCE_LENGTH, TAG_LENGTH} from "../../common/const";
+import {KEY_LENGTH, NONCE_LENGTH} from "../../common/const";
 import {newInstance} from "../../src/wasm";
+import {formatBytes} from "./util";
 
 describe("chacha20poly1305", function () {
   this.timeout(0);
@@ -11,46 +13,59 @@ describe("chacha20poly1305", function () {
     minMs: 30_000,
   });
   const ctx = newInstance();
-  const asImpl = new ChaCha20Poly1305(ctx);
+  const chainsafe = new ChaCha20Poly1305(ctx);
 
   const key = new Uint8Array(crypto.randomBytes(KEY_LENGTH));
-  const jsImpl = new ChaCha20Poly1305Stablelib(key);
+  const stablelib = new ChaCha20Poly1305Stablelib(key);
   const nonce = new Uint8Array(crypto.randomBytes(NONCE_LENGTH));
-  // const jsImpl = new ChaCha20Poly1305Stablelib(key);
   const ad = new Uint8Array(crypto.randomBytes(32));
 
-  for (const dataLength of [512, 4096, 16384, 65_536, 524_288]) {
+  for (const dataLength of [32, 64, 1024, 8192, 65536, 1048576]) {
     const plainText = new Uint8Array(crypto.randomBytes(dataLength));
-    const sealed = jsImpl.seal(nonce, plainText, ad);
+    const sealed = stablelib.seal(nonce, plainText, ad);
 
     itBench({
-      id: `as seal with data length ${dataLength}`,
+      id: `chainsafe seal ${formatBytes(dataLength)}`,
       fn: () => {
-        asImpl.seal(key, nonce, plainText, ad);
+        chainsafe.seal(key, nonce, plainText, ad);
       },
     });
 
     itBench({
-      id: `js seal with data length ${dataLength}`,
+      id: `stablelib seal ${formatBytes(dataLength)}`,
       fn: () => {
-        jsImpl.seal(nonce, plainText, ad);
+        stablelib.seal(nonce, plainText, ad);
       },
     });
 
     itBench({
-      id: `as open with data length ${dataLength}`,
+      id: `noble seal ${formatBytes(dataLength)}`,
+      fn: () => {
+        chacha20poly1305Noble(key, nonce, ad).encrypt(plainText);
+      },
+    });
+
+    itBench({
+      id: `chainsafe open ${formatBytes(dataLength)}`,
       beforeEach: () => new Uint8Array(sealed),
       fn: (clonedSealed) => {
-        // overwriteSealed as true to avoid memory allocation
-        asImpl.open(key, nonce, clonedSealed, ad, clonedSealed.subarray(0, clonedSealed.length - TAG_LENGTH));
+        chainsafe.open(key, nonce, clonedSealed, ad);
       },
     });
 
     itBench({
-      id: `js open with data length ${dataLength}`,
+      id: `stablelib open ${formatBytes(dataLength)}`,
       beforeEach: () => new Uint8Array(sealed),
       fn: (clonedSealed) => {
-        jsImpl.open(nonce, clonedSealed, ad, clonedSealed.subarray(0, clonedSealed.length - TAG_LENGTH));
+        stablelib.open(nonce, clonedSealed, ad);
+      },
+    });
+
+    itBench({
+      id: `noble open ${formatBytes(dataLength)}`,
+      beforeEach: () => new Uint8Array(sealed),
+      fn: (clonedSealed) => {
+        chacha20poly1305Noble(key, nonce, ad).decrypt(clonedSealed);
       },
     });
   }
