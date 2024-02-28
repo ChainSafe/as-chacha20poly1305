@@ -15,7 +15,7 @@ describe("chacha20 (streamXOR) assemblyscript vs javascript", function () {
     const nonceInplaceCounterLength = 4;
 
     itBench({
-      id: `javascript with input length ${inputLength}`,
+      id: `stablelib ${inputLength}`,
       before: () => ({key: new Uint8Array(key), nonce: new Uint8Array(nonce), input: new Uint8Array(input)}),
       beforeEach: (v) => v,
       fn: ({key: k, nonce: n, input: i}) => {
@@ -24,7 +24,7 @@ describe("chacha20 (streamXOR) assemblyscript vs javascript", function () {
     });
 
     itBench({
-      id: `assemblyscript with input length ${inputLength}`,
+      id: `chainsafe ${inputLength}`,
       before: () => ({key: new Uint8Array(key), nonce: new Uint8Array(nonce), input: new Uint8Array(input)}),
       beforeEach: (v) => v,
       fn: ({key: k, nonce: n, input: i}) => {
